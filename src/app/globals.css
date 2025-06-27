@@ -1,4 +1,10 @@
 @import "tailwindcss";
+@import "tailwindcss/preflight";
+@tailwind utilities;
+
+html {
+  scroll-behavior: smooth;
+}
 
 :root {
   --background: #ffffff;
