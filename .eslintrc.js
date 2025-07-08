@@ -36,7 +36,7 @@ module.exports = {
     'react/jsx-uses-react': 'off', // Pas besoin de cette règle car Next.js gère aussi ça
     'react/jsx-uses-vars': 'error', // Pour éviter les variables non utilisées dans JSX
     '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }], // Ignore les arguments inutilisés commençant par "_"
-    '@typescript-eslint/explicit-module-boundary-types': 'off', // Désactive l'obligation de typer toutes les fonctions (souvent redondant en TS)
+    '@typescript-eslint/no-unused-vars': ["error"],
     'prettier/prettier': [
       'error',
       {
