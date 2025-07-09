@@ -27,9 +27,34 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
         return res.status(400).json({ error: 'Fichier manquant' });
       }
 
+       // Vérification du type du fichier (image)
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/gif']; // Types autorisés
+      if (file.mimetype && !allowedTypes.includes(file.mimetype)) {
+        return res.status(400).json({ error: 'Le fichier doit être une image (JPEG, PNG, GIF)' });
+      }
+
+      // Vérification de la taille du fichier (par exemple, 5 Mo max)
+      const maxSize = 5 * 1024 * 1024; // 5 Mo
+      if (file.size > maxSize) {
+        return res.status(400).json({ error: 'Le fichier ne doit pas dépasser 5 Mo' });
+      }
+
+       // Récupérer les tags et la description depuis les champs de FormData
+      const tags = Array.isArray(fields.tags) ? fields.tags : (fields.tags ? [fields.tags] : []);  // Si ce n'est pas un tableau, on le transforme en tableau 
+      const title = fields.title || '';
+      const description = fields.description || '';
+      const customData = fields.customData || '';
+
       try {
         const uploadResponse = await cloudinary.uploader.upload(file.filepath, {
           resource_type: 'auto',
+          tags,
+          context: {
+            caption: title,
+            alt: description,
+            custom_metadata: customData,
+          },
+          
         });
 
         res.status(200).json({ imageUrl: uploadResponse.secure_url });
