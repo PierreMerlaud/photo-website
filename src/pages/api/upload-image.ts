@@ -27,14 +27,14 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
         return res.status(400).json({ error: 'Fichier manquant' });
       }
 
-       // Vérification du type du fichier (image)
+       // Vérification du type du fichier
       const allowedTypes = ['image/jpeg', 'image/png', 'image/gif']; // Types autorisés
       if (file.mimetype && !allowedTypes.includes(file.mimetype)) {
         return res.status(400).json({ error: 'Le fichier doit être une image (JPEG, PNG, GIF)' });
       }
 
-      // Vérification de la taille du fichier (par exemple, 5 Mo max)
-      const maxSize = 5 * 1024 * 1024; // 5 Mo
+      // Vérification de la taille du fichier (ici 5mo max)
+      const maxSize = 5 * 1024 * 1024;
       if (file.size > maxSize) {
         return res.status(400).json({ error: 'Le fichier ne doit pas dépasser 5 Mo' });
       }
