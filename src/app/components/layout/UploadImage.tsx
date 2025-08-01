@@ -6,13 +6,13 @@ const UploadImage = () => {
   const [image, setImage] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
-  const [title, setTitle] = useState<string>(''); // Champs pour le titre
-  const [tags, setTags] = useState<string>(''); // Champs pour les tags
-  const [description, setDescription] = useState<string>(''); // Champs pour la description
-  const [customData, setCustomData] = useState<string>(''); // Champs pour les données personnalisées
 
+  // Champs pour les métadonnées multilingues (saisie en un seul champ)
+  const [title, setTitle] = useState<string>('');  // Saisie pour "Titre en français | Title in English"
+  const [description, setDescription] = useState<string>('');  // Saisie pour "Description en français | Description in English"
+  const [tags, setTags] = useState<string>('');  // Saisie pour "Tags en français | Tags in English"
+  const [customData, setCustomData] = useState<string>('');  // Saisie pour "Données personnalisées en français | Custom data in English"
 
- 
   // Gérer la sélection de l'image
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -20,21 +20,29 @@ const UploadImage = () => {
     }
   };
 
-  const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setTitle(e.target.value);
+  // Gérer les changements des champs
+  const handleFieldChange = (field: 'title' | 'description' | 'tags' | 'customData') => (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    if (field === 'title') setTitle(value);
+    if (field === 'description') setDescription(value);
+    if (field === 'tags') setTags(value);
+    if (field === 'customData') setCustomData(value);
   };
 
-  const handleDescriptionChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setDescription(e.target.value);
+  // Fonction pour séparer les valeurs pour chaque langue
+  const getTranslations = (fieldValue: string) => {
+    const [fr, en] = fieldValue.split('|').map(str => str.trim());
+    return { fr, en };
   };
 
-  const handleTagsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setTags(e.target.value);
+  // Fonction pour séparer les tags et ajouter les préfixes _fr et _en
+  const getTags = (tagsValue: string) => {
+    const [frTags, enTags] = tagsValue.split('|').map(str => str.trim());
+    return {
+      fr: frTags.split(',').map(tag => `fr_${tag.trim()}`),  // Ajout du préfixe _fr
+      en: enTags.split(',').map(tag => `en_${tag.trim()}`)   // Ajout du préfixe _en
+    };
   };
-
-  const handleCustomDataChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setCustomData(e.target.value);
-  }
 
   // Envoyer l'image et les métadonnées à l'API
   const handleSubmit = async (e: React.FormEvent) => {
@@ -49,10 +57,18 @@ const UploadImage = () => {
 
     const formData = new FormData();
     formData.append("file", image);  // L'image
-    formData.append("tags", tags);  // Ajouter les tags
-    formData.append("title", title);  // Ajouter le titre
-    formData.append("description", description);  // Ajouter la description
-    formData.append("customData", customData);  // Ajouter les données personnalisées
+
+    // Séparer les traductions pour chaque métadonnée
+    const titleTranslations = getTranslations(title);
+    const descriptionTranslations = getTranslations(description);
+    const tagsTranslations = getTags(tags);
+    const customDataTranslations = getTranslations(customData);
+
+    // Ajouter les métadonnées multilingues dans le FormData
+    formData.append("title", JSON.stringify(titleTranslations));  // Envoie un objet avec les traductions
+    formData.append("description", JSON.stringify(descriptionTranslations));
+    formData.append("tags", JSON.stringify(tagsTranslations));
+    formData.append("customData", JSON.stringify(customDataTranslations));
 
     try {
       const res = await fetch("/api/upload-image", {
@@ -64,7 +80,7 @@ const UploadImage = () => {
       setIsUploading(false);
 
       if (data.imageUrl) {
-        setUploadedImageUrl(data.imageUrl); // Affiche l'URL de l'image uploadée
+        setUploadedImageUrl(data.imageUrl);  // Affiche l'URL de l'image uploadée
       } else {
         alert("Erreur lors de l'upload de l'image.");
       }
@@ -80,34 +96,43 @@ const UploadImage = () => {
       <form onSubmit={handleSubmit}>
         <input type="file" onChange={handleFileChange} accept="image/*" required />
         <br />
-        <input 
-          type="text" 
-          placeholder="Ajouter des tags (séparés par des virgules)" 
-          value={tags}
-          onChange={handleTagsChange} 
+
+        {/* Champ pour le titre */}
+        <input
+          type="text"
+          placeholder="Titre en français | Title in English"
+          value={title}
+          onChange={handleFieldChange('title')}
         />
         <br />
-        <input 
-          type="text" 
-          placeholder='Ajouter un titre' 
-          value={title} 
-          onChange={handleTitleChange} 
-        />
-        <br />
-        <input 
-          type="text" 
-          placeholder="Ajouter une description" 
+
+        {/* Champ pour la description */}
+        <input
+          type="text"
+          placeholder="Description en français | Description in English"
           value={description}
-          onChange={handleDescriptionChange} 
+          onChange={handleFieldChange('description')}
         />
         <br />
-        <input 
-          type="text" 
-          placeholder="Ajouter des données personnalisées" 
+
+        {/* Champ pour les tags */}
+        <input
+          type="text"
+          placeholder="Tags en français | Tags in English"
+          value={tags}
+          onChange={handleFieldChange('tags')}
+        />
+        <br />
+
+        {/* Champ pour les données personnalisées */}
+        <input
+          type="text"
+          placeholder="Données personnalisées en français | Custom data in English"
           value={customData}
-          onChange={handleCustomDataChange}
+          onChange={handleFieldChange('customData')}
         />
         <br />
+
         <button type="submit" disabled={isUploading}>
           {isUploading ? "Téléchargement en cours..." : "Uploader l'image"}
         </button>

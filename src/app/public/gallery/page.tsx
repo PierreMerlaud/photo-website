@@ -16,7 +16,7 @@ const fetchImages = async () => {
 };
 
 const PublicPage = async () => {
-  const images = await fetchImages(); // Appeler la fonction de récupération d'images
+  const images = await fetchImages();
 
   return (
     <div>
