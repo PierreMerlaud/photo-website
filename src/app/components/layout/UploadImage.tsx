@@ -1,137 +1,136 @@
 "use client";
 
-import { useState } from 'react';
+import { useMemo, useState } from "react";
+import { UploadMetadataSchema, type UploadMetadata, LIMITS } from "@/app/lib/schemas/upload";
 
 const UploadImage = () => {
   const [image, setImage] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Champs pour les métadonnées multilingues (saisie en un seul champ)
-  const [title, setTitle] = useState<string>('');  // Saisie pour "Titre en français | Title in English"
-  const [description, setDescription] = useState<string>('');  // Saisie pour "Description en français | Description in English"
-  const [tags, setTags] = useState<string>('');  // Saisie pour "Tags en français | Tags in English"
-  const [customData, setCustomData] = useState<string>('');  // Saisie pour "Données personnalisées en français | Custom data in English"
+  // Saisie "rapide" (FR | EN). On convertira avant envoi.
+  const [titleRaw, setTitleRaw] = useState("");
+  const [descriptionRaw, setDescriptionRaw] = useState("");
+  const [tagsRaw, setTagsRaw] = useState(""); // "tag1, tag2 | tagA, tagB"
+  const [customRaw, setCustomRaw] = useState("");
 
-  // Gérer la sélection de l'image
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      setImage(e.target.files[0]);
-    }
+    if (e.target.files?.[0]) setImage(e.target.files[0]);
   };
 
-  // Gérer les changements des champs
-  const handleFieldChange = (field: 'title' | 'description' | 'tags' | 'customData') => (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    if (field === 'title') setTitle(value);
-    if (field === 'description') setDescription(value);
-    if (field === 'tags') setTags(value);
-    if (field === 'customData') setCustomData(value);
+  // Helpers de conversion UI -> modèle canonique
+  const splitBi = (value: string) => {
+    const [fr = "", en = ""] = value.split("|");
+    return { fr: fr.trim(), en: en.trim() };
   };
 
-  // Fonction pour séparer les valeurs pour chaque langue
-  const getTranslations = (fieldValue: string) => {
-    const [fr, en] = fieldValue.split('|').map(str => str.trim());
-    return { fr, en };
+  const parseTags = (value: string) => {
+    const { fr, en } = splitBi(value);
+    const toArray = (s: string) =>
+      s
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean);
+
+    return { fr: toArray(fr), en: toArray(en) };
   };
 
-  // Fonction pour séparer les tags et ajouter les préfixes _fr et _en
-  const getTags = (tagsValue: string) => {
-    const [frTags, enTags] = tagsValue.split('|').map(str => str.trim());
-    return {
-      fr: frTags.split(',').map(tag => `fr_${tag.trim()}`),  // Ajout du préfixe _fr
-      en: enTags.split(',').map(tag => `en_${tag.trim()}`)   // Ajout du préfixe _en
-    };
-  };
+  // Construire l'objet metadata (non validé)
+  const metadataDraft: UploadMetadata = useMemo(
+    () => ({
+      title: splitBi(titleRaw),
+      description: splitBi(descriptionRaw),
+      tags: parseTags(tagsRaw),
+      customData: splitBi(customRaw),
+    }),
+    [titleRaw, descriptionRaw, tagsRaw, customRaw]
+  );
 
-  // Envoyer l'image et les métadonnées à l'API
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrorMsg(null);
 
     if (!image) {
-      alert("Veuillez sélectionner une image.");
+      setErrorMsg("Veuillez sélectionner une image.");
       return;
     }
 
+    // ✅ Validation Zod côté client (feedback immédiat)
+    const parsed = UploadMetadataSchema.safeParse(metadataDraft);
+    if (!parsed.success) {
+      const firstError = parsed.error.issues[0];
+      setErrorMsg(firstError?.message ?? "Données invalides");
+      return;
+    }
+    const metadata = parsed.data;
+
     setIsUploading(true);
-
-    const formData = new FormData();
-    formData.append("file", image);  // L'image
-
-    // Séparer les traductions pour chaque métadonnée
-    const titleTranslations = getTranslations(title);
-    const descriptionTranslations = getTranslations(description);
-    const tagsTranslations = getTags(tags);
-    const customDataTranslations = getTranslations(customData);
-
-    // Ajouter les métadonnées multilingues dans le FormData
-    formData.append("title", JSON.stringify(titleTranslations));  // Envoie un objet avec les traductions
-    formData.append("description", JSON.stringify(descriptionTranslations));
-    formData.append("tags", JSON.stringify(tagsTranslations));
-    formData.append("customData", JSON.stringify(customDataTranslations));
-
     try {
-      const res = await fetch("/api/upload-image", {
-        method: "POST",
-        body: formData,
-      });
+      const formData = new FormData();
+      formData.append("file", image);
+      formData.append("metadata", JSON.stringify(metadata)); // ✅ payload unique
 
+      const res = await fetch("/api/upload-image", { method: "POST", body: formData });
       const data = await res.json();
       setIsUploading(false);
 
-      if (data.imageUrl) {
-        setUploadedImageUrl(data.imageUrl);  // Affiche l'URL de l'image uploadée
-      } else {
-        alert("Erreur lors de l'upload de l'image.");
+      if (!res.ok) {
+        setErrorMsg(data?.error?.message ?? "Erreur lors de l'upload");
+        return;
       }
-    } catch (error) {
+
+      setUploadedImageUrl(data?.image?.secureUrl ?? null);
+    } catch {
       setIsUploading(false);
-      alert("Erreur de connexion");
+      setErrorMsg("Erreur de connexion");
     }
   };
 
   return (
     <div>
       <h2>Upload une image vers Cloudinary</h2>
-      <form onSubmit={handleSubmit}>
+
+      <form onSubmit={handleSubmit} encType="multipart/form-data">
         <input type="file" onChange={handleFileChange} accept="image/*" required />
         <br />
 
-        {/* Champ pour le titre */}
         <input
           type="text"
-          placeholder="Titre en français | Title in English"
-          value={title}
-          onChange={handleFieldChange('title')}
+          placeholder="Titre FR | Title EN"
+          value={titleRaw}
+          onChange={(e) => setTitleRaw(e.target.value)}
+          maxLength={LIMITS.titleMax * 2 + 3}
         />
         <br />
 
-        {/* Champ pour la description */}
         <input
           type="text"
-          placeholder="Description en français | Description in English"
-          value={description}
-          onChange={handleFieldChange('description')}
+          placeholder="Description FR | Description EN"
+          value={descriptionRaw}
+          onChange={(e) => setDescriptionRaw(e.target.value)}
+          maxLength={LIMITS.descriptionMax * 2 + 3}
         />
         <br />
 
-        {/* Champ pour les tags */}
         <input
           type="text"
-          placeholder="Tags en français | Tags in English"
-          value={tags}
-          onChange={handleFieldChange('tags')}
+          placeholder="tag1, tag2 | tagA, tagB"
+          value={tagsRaw}
+          onChange={(e) => setTagsRaw(e.target.value)}
         />
         <br />
 
-        {/* Champ pour les données personnalisées */}
         <input
           type="text"
-          placeholder="Données personnalisées en français | Custom data in English"
-          value={customData}
-          onChange={handleFieldChange('customData')}
+          placeholder="Données perso FR | Custom data EN"
+          value={customRaw}
+          onChange={(e) => setCustomRaw(e.target.value)}
+          maxLength={LIMITS.customDataMax * 2 + 3}
         />
         <br />
+
+        {errorMsg && <p style={{ color: "crimson" }}>{errorMsg}</p>}
 
         <button type="submit" disabled={isUploading}>
           {isUploading ? "Téléchargement en cours..." : "Uploader l'image"}
@@ -141,7 +140,7 @@ const UploadImage = () => {
       {uploadedImageUrl && (
         <div>
           <h3>Image uploadée avec succès !</h3>
-          <img src={uploadedImageUrl} alt="Uploaded Image" width="300" />
+          <img src={uploadedImageUrl} alt="Uploaded Image" width={300} />
         </div>
       )}
     </div>
