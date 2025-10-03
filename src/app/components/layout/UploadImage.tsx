@@ -58,11 +58,11 @@ const UploadImage = () => {
 
     // ✅ Validation Zod côté client (feedback immédiat)
     const parsed = UploadMetadataSchema.safeParse(metadataDraft);
-    if (!parsed.success) {
-      const firstError = parsed.error.issues[0];
-      setErrorMsg(firstError?.message ?? "Données invalides");
-      return;
-    }
+      if (!parsed.success) {
+        const errors = parsed.error.issues.map((issue) => issue.message).join(", ");
+        setErrorMsg(errors);
+        return;
+      }
     const metadata = parsed.data;
 
     setIsUploading(true);
@@ -81,8 +81,9 @@ const UploadImage = () => {
       }
 
       setUploadedImageUrl(data?.image?.secureUrl ?? null);
-    } catch {
+    } catch (error) {
       setIsUploading(false);
+      console.error(error);
       setErrorMsg("Erreur de connexion");
     }
   };
@@ -100,7 +101,7 @@ const UploadImage = () => {
           placeholder="Titre FR | Title EN"
           value={titleRaw}
           onChange={(e) => setTitleRaw(e.target.value)}
-          maxLength={LIMITS.titleMax * 2 + 3}
+          maxLength={LIMITS.titleMax}
         />
         <br />
 
@@ -109,7 +110,7 @@ const UploadImage = () => {
           placeholder="Description FR | Description EN"
           value={descriptionRaw}
           onChange={(e) => setDescriptionRaw(e.target.value)}
-          maxLength={LIMITS.descriptionMax * 2 + 3}
+          maxLength={LIMITS.descriptionMax}
         />
         <br />
 
@@ -126,23 +127,26 @@ const UploadImage = () => {
           placeholder="Données perso FR | Custom data EN"
           value={customRaw}
           onChange={(e) => setCustomRaw(e.target.value)}
-          maxLength={LIMITS.customDataMax * 2 + 3}
+          maxLength={LIMITS.customDataMax}
         />
         <br />
-
-        {errorMsg && <p style={{ color: "crimson" }}>{errorMsg}</p>}
 
         <button type="submit" disabled={isUploading}>
           {isUploading ? "Téléchargement en cours..." : "Uploader l'image"}
         </button>
       </form>
-
-      {uploadedImageUrl && (
+      
+      {uploadedImageUrl ? (
         <div>
           <h3>Image uploadée avec succès !</h3>
           <img src={uploadedImageUrl} alt="Uploaded Image" width={300} />
         </div>
+      ) : errorMsg && (
+        <div style={{ color: "crimson" }}>
+          <p>{errorMsg}</p>
+        </div>
       )}
+
     </div>
   );
 };
