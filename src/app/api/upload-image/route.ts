@@ -1,4 +1,3 @@
-// src/app/api/upload-image/route.ts
 import { NextResponse } from "next/server";
 import cloudinary from "@/app/lib/cloudinary";
 import { UploadMetadataSchema, type UploadMetadata } from "@/app/lib/schemas/upload";
